@@ -48,6 +48,14 @@ mod tests {
         TextSearch::new(vec!["a", "abc", "add", "b", "bbc"])
     }
 
+    fn bigger_ts() -> TextSearch<Vec<&'static str>> {
+        let input = vec!["a", "b", "go", "golang", "rust"];
+        let mut input_sorted = vec!["a", "b", "go", "golang", "rust"];
+        input_sorted.sort_unstable();
+        assert_eq!(input, input_sorted);
+        TextSearch::new(input_sorted)
+    }
+
     #[test]
     fn one_element_store() {
         let search = TextSearch::new(vec!["b"]);
@@ -86,12 +94,17 @@ mod tests {
         assert_eq!(e, empty);
     }
 
-    /*
     #[test]
     fn test_2st_matches() {
         let search = simple_ts();
         let e = search.find_all("bb");
         assert_eq!(e, vec![&"bbc"]);
     }
-    */
+
+    #[test]
+    fn test_matches_complex() {
+        let search = bigger_ts();
+        let e = search.find_all("go");
+        assert_eq!(e, vec![&"go", &"golang"]);
+    }
 }

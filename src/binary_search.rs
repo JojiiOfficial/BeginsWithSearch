@@ -61,9 +61,11 @@ impl<'a, S: TextStore> Iterator for Search<'a, S> {
 
             match self.compare(curr_item.get_text()) {
                 Ordering::Equal => {
-                    println!("equal: {}", curr_item.get_text());
                     self.last_pos = curr_index;
                     self.found_first = true;
+                    if curr_item.get_text().len() < self.query.len() {
+                        continue;
+                    }
                     return Some(curr_item);
                 }
                 Ordering::Greater => {
