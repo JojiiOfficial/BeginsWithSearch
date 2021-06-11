@@ -1,6 +1,8 @@
+use crate::store_item::Item;
+
 /// Store text data
 pub trait TextStore {
-    type Item: Ord + Sized;
+    type Item: Item;
 
     /// Returns the Item at [`pos`]
     fn get_at(&self, pos: usize) -> Option<&Self::Item>;
@@ -9,7 +11,7 @@ pub trait TextStore {
     fn len(&self) -> usize;
 }
 
-impl<T: Ord> TextStore for Vec<T> {
+impl<T: Item> TextStore for Vec<T> {
     type Item = T;
 
     fn len(&self) -> usize {
