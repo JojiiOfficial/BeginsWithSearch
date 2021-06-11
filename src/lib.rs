@@ -1,10 +1,9 @@
-pub mod binary_search;
 pub mod store_item;
 pub mod text_store;
 
-use std::iter::from_fn;
+use std::{cmp::Ordering, iter::from_fn};
 
-use binary_search::Search;
+use store_item::Item;
 use text_store::TextStore;
 
 pub struct TextSearch<S: TextStore> {
@@ -24,24 +23,70 @@ impl<S: TextStore> TextSearch<S> {
             return vec![];
         }
 
-        Search::new(&self.text_store, query).collect()
+        self.binary_search_custom(query)
     }
 
-    /// Returns an iterator over all found elements
-    pub fn find<'a>(&'a self, query: &'a str) -> impl Iterator<Item = &S::Item> + 'a {
-        let mut search = Search::new(&self.text_store, query);
-        from_fn(move || {
-            if query.is_empty() {
-                None
-            } else {
-                search.next()
+    fn binary_search_custom<'a>(&'a self, query: &str) -> Vec<&'a S::Item> {
+        let bin_search = self
+            .text_store
+            .binary_search_by(|a| my_cmp(a.get_text(), &query));
+        let index = match bin_search {
+            Ok(s) => s,
+            Err(s) => s,
+        };
+
+        if index >= self.text_store.len() {
+            return vec![];
+        }
+
+        let mut pos = index;
+        loop {
+            if pos == 0 {
+                break;
             }
-        })
+            let prev_pos = pos - 1;
+            let prev_item = self.text_store.get_at(prev_pos).unwrap();
+            if my_cmp(prev_item.get_text(), query) == Ordering::Equal {
+                if pos == 0 {
+                    break;
+                }
+                pos = prev_pos;
+            } else {
+                break;
+            }
+        }
+        let first_item = pos;
+
+        let mut res = Vec::new();
+
+        for pos in first_item..self.text_store.len() {
+            let item = self.text_store.get_at(pos).unwrap();
+            if my_cmp(item.get_text(), query) == Ordering::Equal {
+                res.push(item);
+            } else {
+                break;
+            }
+        }
+
+        res
+    }
+}
+
+fn my_cmp(a: &str, b: &str) -> Ordering {
+    if a.starts_with(b) {
+        Ordering::Equal
+    } else {
+        a.cmp(b)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        fs::File,
+        io::{BufRead, BufReader, Write},
+    };
+
     use super::*;
 
     fn simple_ts() -> TextSearch<Vec<&'static str>> {
@@ -52,9 +97,16 @@ mod tests {
         TextSearch::new(vec!["b", "bbc"])
     }
 
+    fn bigger_ts() -> TextSearch<Vec<&'static str>> {
+        let input = vec!["a", "b", "go", "golang", "rust"];
+        let mut input_sorted = vec!["a", "b", "go", "golang", "rust"];
+        input_sorted.sort_unstable();
+        assert_eq!(input, input_sorted);
+        TextSearch::new(input_sorted)
+    }
+
     fn simple_dataset() -> Vec<TextSearch<Vec<&'static str>>> {
         vec![simple_ts(), simple_ts2()]
-        //vec![simple_ts2()]
     }
 
     #[test]
@@ -63,6 +115,13 @@ mod tests {
             let e = search.find_all("b");
             assert_eq!(e, vec![&"b", &"bbc"]);
         }
+    }
+
+    #[test]
+    fn one_element_store() {
+        let search = TextSearch::new(vec!["b"]);
+        let e = search.find_all("b");
+        assert_eq!(e, vec![&"b"]);
     }
 
     #[test]
@@ -92,13 +151,6 @@ mod tests {
     }
 
     #[test]
-    fn one_element_store() {
-        let search = TextSearch::new(vec!["b"]);
-        let e = search.find_all("b");
-        assert_eq!(e, vec![&"b"]);
-    }
-
-    #[test]
     fn one_element_store_not_found() {
         let search = TextSearch::new(vec!["b"]);
         let e = search.find_all("0");
@@ -119,13 +171,5 @@ mod tests {
         let e = search.find_all("ga");
         let empty: Vec<&&str> = Vec::new();
         assert_eq!(e, empty);
-    }
-
-    fn bigger_ts() -> TextSearch<Vec<&'static str>> {
-        let input = vec!["a", "b", "go", "golang", "rust"];
-        let mut input_sorted = vec!["a", "b", "go", "golang", "rust"];
-        input_sorted.sort_unstable();
-        assert_eq!(input, input_sorted);
-        TextSearch::new(input_sorted)
     }
 }
