@@ -8,3 +8,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+simsearch = "0.2.3"
+
+[dev-dependencies]
+simsearch = "0.2.3"

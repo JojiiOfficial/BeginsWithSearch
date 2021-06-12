@@ -1,9 +1,8 @@
+mod search;
 pub mod store_item;
 pub mod text_store;
 
-use std::{cmp::Ordering, iter::from_fn};
-
-use store_item::Item;
+use search::Search;
 use text_store::TextStore;
 
 pub struct TextSearch<S: TextStore> {
@@ -12,7 +11,7 @@ pub struct TextSearch<S: TextStore> {
 
 impl<S: TextStore> TextSearch<S> {
     /// Creates a new [`Serach`] based on searchable data. The input must be sorted and implement
-    /// `PartialEq`
+    /// `Ord`
     pub fn new(text_store: S) -> Self {
         Self { text_store }
     }
@@ -23,60 +22,17 @@ impl<S: TextStore> TextSearch<S> {
             return vec![];
         }
 
-        self.binary_search_custom(query)
+        let search = self.search(query);
+        search.search().collect()
     }
 
-    fn binary_search_custom<'a>(&'a self, query: &str) -> Vec<&'a S::Item> {
-        let bin_search = self
-            .text_store
-            .binary_search_by(|a| my_cmp(a.get_text(), &query));
-        let index = match bin_search {
-            Ok(s) => s,
-            Err(s) => s,
-        };
-
-        if index >= self.text_store.len() {
-            return vec![];
-        }
-
-        let mut pos = index;
-        loop {
-            if pos == 0 {
-                break;
-            }
-            let prev_pos = pos - 1;
-            let prev_item = self.text_store.get_at(prev_pos).unwrap();
-            if my_cmp(prev_item.get_text(), query) == Ordering::Equal {
-                if pos == 0 {
-                    break;
-                }
-                pos = prev_pos;
-            } else {
-                break;
-            }
-        }
-        let first_item = pos;
-
-        let mut res = Vec::new();
-
-        for pos in first_item..self.text_store.len() {
-            let item = self.text_store.get_at(pos).unwrap();
-            if my_cmp(item.get_text(), query) == Ordering::Equal {
-                res.push(item);
-            } else {
-                break;
-            }
-        }
-
-        res
+    /// Same as `find_all` but returns an iterator over each element
+    pub fn find<'a>(&'a self, query: &'a str) -> impl Iterator<Item = &'a S::Item> {
+        self.search(query).search()
     }
-}
 
-fn my_cmp(a: &str, b: &str) -> Ordering {
-    if a.starts_with(b) {
-        Ordering::Equal
-    } else {
-        a.cmp(b)
+    fn search<'a>(&'a self, query: &'a str) -> Search<'a, S> {
+        Search::new(query, &self.text_store)
     }
 }
 
@@ -85,7 +41,10 @@ mod tests {
     use std::{
         fs::File,
         io::{BufRead, BufReader, Write},
+        time::SystemTime,
     };
+
+    use simsearch::{SearchOptions, SimSearch};
 
     use super::*;
 
@@ -171,5 +130,39 @@ mod tests {
         let e = search.find_all("ga");
         let empty: Vec<&&str> = Vec::new();
         assert_eq!(e, empty);
+    }
+
+    #[test]
+    fn file() {
+        let file = File::open("./output.json").unwrap();
+        let reader = BufReader::new(file);
+        let vec: Vec<String> = reader.lines().map(|i| i.unwrap()).collect();
+
+        let searc = TextSearch::new(vec);
+        let start = SystemTime::now();
+        let res = searc.find_all("music");
+        println!("found: {}", res.len());
+        println!("took {:?}", start.elapsed());
+    }
+
+    #[test]
+    fn file_sidm() {
+        let file = File::open("./output.json").unwrap();
+        let reader = BufReader::new(file);
+        let vec: Vec<String> = reader.lines().map(|i| i.unwrap()).collect();
+
+        let options = SearchOptions::new()
+            .levenshtein(true)
+            .threshold(0.99)
+            .case_sensitive(true);
+        let mut engine: SimSearch<String> = SimSearch::new_with(options);
+        for (i, v) in vec.into_iter().enumerate() {
+            engine.insert(v.clone(), &v);
+        }
+        let start = SystemTime::now();
+        let results: Vec<_> = engine.search("music");
+        println!("sdim found: {:#?}", results);
+        println!("sdim took {:?}", start.elapsed());
+        println!("sdim found: {}", results.len());
     }
 }
