@@ -176,7 +176,7 @@ mod tests {
 
         let searc = TextSearch::new(&vec);
         let start = SystemTime::now();
-        let query = "lock";
+        let query = "cmon";
         let mut res: Vec<&String> = searc.find_jaro(query, 5).collect();
         res.sort_by(|l, r| {
             let l_j = (jaro_winkler(l, query) * 100_f64) as u32;
@@ -184,7 +184,7 @@ mod tests {
             r_j.cmp(&l_j)
         });
 
-        println!("{:#?}", res.iter().take(10).collect::<Vec<_>>());
+        println!("{:#?}", res.iter().take(10000).collect::<Vec<_>>());
         println!("lev found: {}", res.len());
         println!("lev took {:?}", start.elapsed());
     }

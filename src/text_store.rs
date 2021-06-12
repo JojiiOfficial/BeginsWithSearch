@@ -40,6 +40,19 @@ pub trait TextStore {
     }
 }
 
+impl<T: Item> TextStore for &Vec<T> {
+    type Item = T;
+
+    fn len(&self) -> usize {
+        (*self).len()
+    }
+
+    fn get_at(&self, pos: usize) -> &T {
+        // Its safe. Trust me
+        unsafe { self.get_unchecked(pos) }
+    }
+}
+
 impl<T: Item> TextStore for Vec<T> {
     type Item = T;
 
